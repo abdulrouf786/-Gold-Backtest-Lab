@@ -94,7 +94,7 @@ def backtest(d,strategy):
                 if risk<=0: continue
                 sl=entry-risk if side=="LONG" else entry+risk
                 tp=entry+RR*risk if side=="LONG" else entry-RR*risk
-                pos={"strategy":strategy,"side":side,"signal_time":d.index[i].isoformat(),"entry_time":d.index[i+1].name.isoformat(),"entry":entry,"sl":sl,"tp":tp}
+                pos={"strategy":strategy,"side":side,"signal_time":d.index[i].isoformat(),"entry_time":d.index[i+1].isoformat(),"entry":entry,"sl":sl,"tp":tp}
     if pos:
         last=d.iloc[-1]; R=((last.Close-pos["entry"])/(pos["entry"]-pos["sl"])) if pos["side"]=="LONG" else ((pos["entry"]-last.Close)/(pos["sl"]-pos["entry"]))
         trades.append({**pos,"exit_time":d.index[-1].isoformat(),"exit":float(last.Close),"R":float(R),"result":"OPEN/EOD"})
