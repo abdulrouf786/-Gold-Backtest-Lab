@@ -17,8 +17,16 @@ jobs:
       - name: Run backtest
         run: python backtest.py
       - name: Upload reports
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: gold-backtest-reports
           path: reports/
           if-no-files-found: error
+      - name: Send Telegram report
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BACKTEST_STATUS: ${{ job.status }}
+        run: python telegram_notify.py
