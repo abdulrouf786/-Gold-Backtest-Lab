@@ -10,7 +10,7 @@ Compare five rule-based XAUUSD/Gold strategy prototypes on historical candles. T
 5. Asian-range sweep + London/NY reversal
 
 ## Data
-The script downloads Yahoo Finance **COMEX Gold futures (GC=F)** via yfinance. It is a free proxy, not necessarily the user's broker's XAUUSD feed. Yahoo intraday data is limited and may change. Backtest results can be affected by spread, slippage, commissions, data gaps, and candle ambiguity.
+The script downloads public OKX historical candles for PAXG-USDT (gold-backed token, NOT broker XAUUSD). Binance API returned HTTP 451 from the GitHub runner, so OKX is used as the market data source. No API key is needed. OKX history availability may vary by instrument and timeframe. Backtest results can be affected by spread, slippage, commissions, data gaps, and candle ambiguity.
 
 ## Run locally
 ```bash
