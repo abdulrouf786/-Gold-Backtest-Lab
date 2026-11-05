@@ -15,24 +15,33 @@ BASE="https://api.binance.com/api/v3/klines"
 STRATEGIES=["Sweep_MSS_FVG","Sweep_MSS_OB","Failed_Breakout","Sweep_Displacement_FVG","Trend_Pullback"]
 
 def download():
-    # Binance returns HTTP 451 from the GitHub runner. Use OKX public API (no API key).
-    # Standard endpoint supports up to 1440 candles; 15m ~= 15 days, 1h ~= 60 days.
+    # OKX public historical candles: no API key needed. Binance runner got HTTP 451.
     bar_map={"1m":"1m","3m":"3m","5m":"5m","15m":"15m","30m":"30m","1h":"1H","4h":"4H","1d":"1D"}
     if INTERVAL not in bar_map: raise ValueError("Unsupported interval")
     inst=os.getenv("OKX_INST_ID","PAXG-USDT")
     mins={"1m":1,"3m":3,"5m":5,"15m":15,"30m":30,"1h":60,"4h":240,"1d":1440}[INTERVAL]
-    limit=min(1440,max(300,int(DAYS*1440/mins)))
-    q=urllib.parse.urlencode({"instId":inst,"bar":bar_map[INTERVAL],"limit":limit})
-    url="https://www.okx.com/api/v5/market/candles?"+q
-    req=urllib.request.Request(url,headers={"User-Agent":"GoldBacktestLab/1.0"})
-    with urllib.request.urlopen(req,timeout=30) as response:
-        payload=json.loads(response.read().decode())
-    if payload.get("code")!="0" or not payload.get("data"):
-        raise RuntimeError(f"OKX API error for {inst}: {payload.get('msg','no data')}")
-    df=pd.DataFrame(payload["data"],columns=["time","Open","High","Low","Close","Volume","vol_ccy","vol_quote","confirm"])
+    target=max(300,int(DAYS*1440/mins))
+    all_rows=[]; cursor=None; endpoint="https://www.okx.com/api/v5/market/history-candles"
+    while len(all_rows)<target:
+        params={"instId":inst,"bar":bar_map[INTERVAL],"limit":min(100,target-len(all_rows))}
+        if cursor is not None: params["after"]=str(cursor)
+        url=endpoint+"?"+urllib.parse.urlencode(params)
+        req=urllib.request.Request(url,headers={"User-Agent":"GoldBacktestLab/1.0"})
+        with urllib.request.urlopen(req,timeout=30) as response: payload=json.loads(response.read().decode())
+        if payload.get("code")!="0" or not payload.get("data"):
+            raise RuntimeError(f"OKX API error for {inst}: {payload.get('msg','no data')}")
+        batch=payload["data"]; all_rows.extend(batch)
+        oldest=min(int(row[0]) for row in batch)
+        if cursor==oldest or len(batch)<2: break
+        cursor=oldest
+        time.sleep(0.12)
+    df=pd.DataFrame(all_rows,columns=["time","Open","High","Low","Close","Volume","vol_ccy","vol_quote","confirm"])
     df["time"]=pd.to_datetime(pd.to_numeric(df["time"]),unit="ms",utc=True)
     for col in ["Open","High","Low","Close","Volume"]: df[col]=pd.to_numeric(df[col],errors="coerce")
     df=df.set_index("time")[["Open","High","Low","Close","Volume"]].dropna().sort_index()
+    df=df[~df.index.duplicated(keep="last")]
+    cutoff=pd.Timestamp.now(tz="UTC")-pd.Timedelta(days=DAYS)
+    df=df[df.index>=cutoff]
     return df.iloc[:-1] if len(df)>1 else df
 
 def indicators(df):
@@ -97,7 +106,7 @@ def stats(t,s):
     return {"strategy":s,"trades":len(t),"wins":int((r>0).sum()),"losses":int((r<0).sum()),"win_rate_pct":round((r>0).mean()*100,2),"net_R":round(r.sum(),2),"profit_factor":round(wins/losses,2) if losses else "inf","max_drawdown_R":round(float(dd),2)}
 
 def main():
-    print(f"Fetching OKX {SYMBOL} {INTERVAL} candles (latest available window)")
+    print(f"Fetching OKX PAXG-USDT {INTERVAL} candles for approximately {DAYS} days")
     d=indicators(download()); results=[]; alltrades=[]
     for s in STRATEGIES:
         t=backtest(d,s); results.append(stats(t,s))
