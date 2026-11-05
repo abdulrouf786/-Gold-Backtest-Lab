@@ -8,25 +8,33 @@ permissions:
 jobs:
   backtest:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - name: Run backtest
+      - name: Install requirements
+        run: pip install -r requirements.txt
+      - name: Run Binance Gold-token backtest
+        env:
+          SYMBOL: PAXGUSDT
+          INTERVAL: 15m
+          DAYS: "60"
+          RR: "2.0"
+          ATR_MULT: "1.5"
         run: python backtest.py
-      - name: Upload reports
-        if: success()
+      - name: Upload backtest reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gold-backtest-reports
           path: reports/
-          if-no-files-found: error
-      - name: Send Telegram report
+          if-no-files-found: warn
+      - name: Send Telegram result
         if: always()
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BACKTEST_STATUS: ${{ job.status }}
         run: python telegram_notify.py
